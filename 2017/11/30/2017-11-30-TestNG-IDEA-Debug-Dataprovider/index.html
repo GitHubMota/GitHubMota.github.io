@@ -1,0 +1,1552 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next gemini use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Java,IDE," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="背景记录一次IntelliJ IDEA基于TestNG测试框架使用DataProvider碰到问题的调试过程. 代码注:以下代码经过简化 @DataProvider(name = &amp;quot;getUrls&amp;quot;) public Object[][] getUrls() {     return new Object[][]{             {&amp;quot;www.baidu.com">
+<meta name="keywords" content="Java,IDE">
+<meta property="og:type" content="article">
+<meta property="og:title" content="IDEA TestNG DataProvider问题调试">
+<meta property="og:url" content="https://githubmota.github.io/2017/11/30/2017-11-30-TestNG-IDEA-Debug-Dataprovider/index.html">
+<meta property="og:site_name" content="Mota&#39;s blog">
+<meta property="og:description" content="背景记录一次IntelliJ IDEA基于TestNG测试框架使用DataProvider碰到问题的调试过程. 代码注:以下代码经过简化 @DataProvider(name = &amp;quot;getUrls&amp;quot;) public Object[][] getUrls() {     return new Object[][]{             {&amp;quot;www.baidu.com">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2018-07-02T08:17:17.727Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="IDEA TestNG DataProvider问题调试">
+<meta name="twitter:description" content="背景记录一次IntelliJ IDEA基于TestNG测试框架使用DataProvider碰到问题的调试过程. 代码注:以下代码经过简化 @DataProvider(name = &amp;quot;getUrls&amp;quot;) public Object[][] getUrls() {     return new Object[][]{             {&amp;quot;www.baidu.com">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Gemini',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="https://githubmota.github.io/2017/11/30/2017-11-30-TestNG-IDEA-Debug-Dataprovider/"/>
+
+
+
+
+
+  <title>IDEA TestNG DataProvider问题调试 | Mota's blog</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Mota's blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">Every flight start at floor!</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-commonweal">
+          <a href="/404/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-heartbeat"></i> <br />
+            
+            公益404
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off"
+             placeholder="搜索..." spellcheck="false"
+             type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://githubmota.github.io/2017/11/30/2017-11-30-TestNG-IDEA-Debug-Dataprovider/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="Mota">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Mota's blog">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">IDEA TestNG DataProvider问题调试</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2017-11-30T23:20:57+08:00">
+                2017-11-30
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/问题分析/" itemprop="url" rel="index">
+                    <span itemprop="name">问题分析</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2017/11/30/2017-11-30-TestNG-IDEA-Debug-Dataprovider/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2017/11/30/2017-11-30-TestNG-IDEA-Debug-Dataprovider/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2017/11/30/2017-11-30-TestNG-IDEA-Debug-Dataprovider/" class="leancloud_visitors" data-flag-title="IDEA TestNG DataProvider问题调试">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">阅读次数&#58;</span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p><strong>记录一次IntelliJ IDEA基于TestNG测试框架使用DataProvider碰到问题的调试过程.</strong></p>
+<h2 id="代码"><a href="#代码" class="headerlink" title="代码"></a>代码</h2><p>注:以下代码经过简化</p>
+<pre><code>@DataProvider(name = &quot;getUrls&quot;)
+public Object[][] getUrls() {
+    return new Object[][]{
+            {&quot;www.baidu.com&quot;},
+            {&quot;www.google.com&quot;},
+    };
+}
+
+@Test(dataProvider = &quot;getUrls&quot;)
+public void getUrl(String url) {
+    System.out.println(&quot;GET &quot; + url);
+}
+
+@DataProvider(name = &quot;postUrls&quot;)
+public Object[][] postUrls() {
+    return new Object[][]{
+            {&quot;www.baidu.com&quot;},
+            {&quot;www.google.com&quot;},
+    };
+}
+
+@Test(dataProvider = &quot;postUrls&quot;)
+public void postUrl(String url) {
+    System.out.println(&quot;POST &quot; + url);
+}
+</code></pre><h2 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h2><p>在IDEA中点击绿色三角箭头运行getUrl测试方法， 期望输出</p>
+<pre><code>GET www.baidu.com
+GET www.google.com
+</code></pre><p>实际只输出</p>
+<pre><code>GET www.baidu.com
+</code></pre><h2 id="定位"><a href="#定位" class="headerlink" title="定位"></a>定位</h2><ol>
+<li>代码中有另外一个测试方法postUrl使用dataProvider却能正常输出（也是通过IDEA点击绿色三角箭头运行)， 对比两者实现并无不同.</li>
+<li><p>考虑到getUrls的DataProvider返回的Object[][]可能出问题</p>
+<ul>
+<li><p>尝试将getUrl方法对应DataProvider指定到postUrls，即改成</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">@Test(dataProvider = &quot;postUrls&quot;)</span><br><span class="line">public void getUrl(String url)</span><br><span class="line">&#123;</span><br><span class="line">    System.out.println(&quot;GET &quot;+url);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>结果仍然只输出<code>GET www.baidu.com</code></p>
+</li>
+<li><p>继续尝试将postUrl方法对应DataProvider指定到getUrls，即改成</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">@Test(dataProvider = &quot;getUrls&quot;)</span><br><span class="line">public void postUrl(String url)</span><br><span class="line">&#123;</span><br><span class="line">    System.out.println(&quot;POST &quot;+url);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</li>
+</ul>
+</li>
+</ol>
+<ul>
+<li><p>结果正常输出</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">POST www.baidu.com</span><br><span class="line">POST www.google.com</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>说明DataProvider的定义没有问题</p>
+</li>
+</ul>
+<ol start="3">
+<li>继续将有问题的getUrl向正常的postUrl做趋近修改，将getUrl命名改成postUrl，再次运行发现正常.<br>将名字修改成其他的， 运行后依然能正常输出.<ul>
+<li>猜测getUrl名字有问题</li>
+</ul>
+</li>
+<li>直接在命令行中指定getUrl方法单独运行，能正常输出.<ul>
+<li>推测IDEA工具对getUrl处理问题</li>
+</ul>
+</li>
+</ol>
+<h2 id="调试"><a href="#调试" class="headerlink" title="调试"></a>调试</h2><p>开始对运行测试过程进行调试</p>
+<p>环境： <code>Testng 6.8.8</code>  <code>IDEA 2017.2.6</code> <code>Java 1.8</code></p>
+<p>首先由于运行的是测试方法， 在<code>testng</code>代码中找到<code>invokeTestMethods</code>函数,该函数在<code>TestMethodWorker.run()</code>中被调用.</p>
+<p>在该函数入口加断点， debug运行， 进入其实现中.</p>
+<p>在<code>invokeTestMethods</code>函数定位到调用单个方法<code>invokeTestMethod</code>函数代码</p>
+<pre><code>while (allParameterValues.hasNext()) {
+…
+invokeTestMethod
+…}
+</code></pre><p>查看其循环条件中<code>allParameterValues</code>为Object[]类型迭代器，<br>Object[][] <code>allParameterValues.m_objects</code>内只存放了<code>www.baidu.com</code>. 所以循环只执行一次，只输出了<br><code>GET www.baidu.com</code>.</p>
+<p>定位到<code>allParameterValues</code>赋值处</p>
+<pre><code>ParameterBag bag = createParameters(testMethod,
+    parameters, allParameterNames, null, suite, testContext, instances[0],
+    null);
+........
+Iterator&lt;Object[]&gt; allParameterValues = bag.parameterHolder.parameters;
+</code></pre><p>Debug <code>createParameters</code>函数一层层进入直到<code>handleParameters</code>函数，该函数负责填充方法，其注释</p>
+<pre><code>/**
+ * If the method has parameters, fill them in. Either by using a @DataProvider
+ * if any was provided, or by looking up &lt;parameters&gt; in testng.xml
+ * @return An Iterator over the values for each parameter of this
+ * method.
+ */
+</code></pre><p>从注释中可以确认其使用<code>DataProvider</code>解析参数.</p>
+<pre><code>parameters = MethodInvocationHelper.invokeDataProvider(
+    instance, /* a test instance or null if the dataprovider is static*/
+    dataProviderHolder.method,
+    testMethod,
+    methodParams.context,
+    fedInstance,
+    annotationFinder);
+Iterator&lt;Object[]&gt; filteredParameters = filterParameters(parameters,
+    testMethod.getInvocationNumbers());
+</code></pre><p>继续step调试， 经过<code>invokeDataProvider</code>函数解析后返回的<code>parameters</code>是包含了预期参数的.</p>
+<p>问题出现在后面的<code>filterParameters</code>函数调用，执行后<code>filteredParameters</code>只剩下一组参数了.</p>
+<p>开始分析<code>filteredParameters</code>函数的实现， 其传入的第二个参数为<code>List&lt;Integer&gt; list</code>， 即元素为整型的列表， 其使用如下：</p>
+<pre><code>/**
+ * If numbers is empty, return parameters, otherwise, return a subset of parameters
+ * whose ordinal number match these found in numbers.
+ */
+static private Iterator&lt;Object[]&gt; filterParameters(Iterator&lt;Object[]&gt; parameters,
+    List&lt;Integer&gt; list) {
+  if (list.isEmpty()) {
+    return parameters;
+  } else {
+    List&lt;Object[]&gt; result = Lists.newArrayList();
+    int i = 0;
+    while (parameters.hasNext()) {
+      Object[] next = parameters.next();
+      if (list.contains(i)) {
+        result.add(next);
+      }
+      i++;
+    }
+    return new ArrayIterator(result.toArray(new Object[list.size()][]));
+  }
+}
+</code></pre><p>分析<code>if(list.contains(i))</code>代码部分及结合注释可以知道， 该函数使用第二个参数对参数组进行过滤，如果<code>list</code>包含数字<code>i</code> ,则过滤出参数组索引为<code>i</code>的，在该问题环境代码中，<code>list</code>只包含一个元素<code>0</code>，导致第0组参数<code>www.baidu.com</code>被过滤出来，最终只执行了该参数的方法.</p>
+<p>对比正常情况<code>list</code>应该为<code>null</code>， 接下来debug <code>list</code>在何处被错误设置的.</p>
+<p><code>list</code>为<code>testMethod.getInvocationNumbers()</code>返回的<code>m_invocationNumbers</code>，在代码中搜索定位到</p>
+<pre><code>public XmlInclude(String n, List&lt;Integer&gt; list, int index) {
+  m_name = n;
+  m_invocationNumbers = list;
+  m_index = index;
+}
+</code></pre><p>在该函数中加入断点重新debug，在第二次执行到该处时其被赋值为只包含一个元素<code>0</code>的<code>list</code>，此时调用栈如下</p>
+<pre><code>&quot;main@1&quot; prio=5 tid=0x1 nid=NA runnable
+  java.lang.Thread.State: RUNNABLE
+      at org.testng.xml.XmlInclude.&lt;init&gt;(XmlInclude.java:37)
+      at org.testng.IDEARemoteTestNG.run(IDEARemoteTestNG.java:59)
+      at org.testng.RemoteTestNGStarter.main(RemoteTestNGStarter.java:123)
+</code></pre><p>本地没有IDEA的代码，在网上搜索，找到<code>IDEARemoteTestNG.java</code></p>
+<pre><code>for (XmlInclude include : aClass.getIncludedMethods()) {    
+    includes.add(new XmlInclude(include.getName(), Collections.singletonList(Integer.parseInt(myParam)), 0));
+}
+</code></pre><p><code>XmlInclue</code>函数在该处调用，并且传入参数<code>Collections.singletonList</code>为<code>list</code>,<code>myParam</code>值为<code>0</code> <code>(通过IDEA在debugger窗口定位到org.testng.IDEARemoteTestNG.run(IDEARemoteTestNG.java:59)后加入myParam监视获得）</code></p>
+<p><code>myParam</code>赋值</p>
+<pre><code>private final String myParam;    
+    public IDEARemoteTestNG(String param) {
+    myParam = param;
+}
+</code></pre><p>调用处在<code>RemoteTestNGStarter.java中</code></p>
+<pre><code>final IDEARemoteTestNG testNG = new IDEARemoteTestNG(param);
+</code></pre><p>查看<code>param</code>赋值处如下</p>
+<pre><code>public static void main(String[] args) throws Exception {    
+    int i = 0;
+    String param = null;
+    String commandFileName = null;
+    String workingDirs = null;
+    Vector resultArgs = new Vector();
+    for (; i &lt; args.length; i++) {
+    String arg = args[i];
+    if (arg.startsWith(&quot;@name&quot;)) {
+    param = arg.substring(5);
+    continue;
+    }
+</code></pre><p><code>param</code>通过传入参数<code>&quot;@name0&quot;</code>解析出来的.</p>
+<p>打开IDEA Console界面发现命令运行打印信息：</p>
+<pre><code>……… org.testng.RemoteTestNGStarter @name0 ……… 
+</code></pre><p>那么问题来了，这个参数是从哪里来的?</p>
+<p>打开<code>IDEA Run/Debug Configuration</code>界面中<code>getUrl</code>测试方法对应窗口， 在<code>JDK Settings</code>标签中的<code>Test runner params</code>发现写入了个<code>0</code>.<br>估计是运行测试过程中不小心敲入的:)</p>
+<p><strong>将<code>0</code>删除后运行正常,至此问题得到修复</strong></p>
+<h2 id="Test-runner-params"><a href="#Test-runner-params" class="headerlink" title="Test runner params"></a>Test runner params</h2><p>从IDEA官网上查看该参数的说明：<code>Arguments to be passed to the test runner</code>  </p>
+<p>还想知道在哪里给0加上<code>@name</code>前缀的.</p>
+<p>在IDEA代码中搜索<code>@name</code>，定位到<code>JavaTestFrameworkRunnableState.java</code></p>
+<pre><code>protected List&lt;String&gt; getNamedParams(String parameters) {    
+    return Collections.singletonList(&quot;@name&quot; + parameters);
+}
+</code></pre><p>该函数<code>getNamedParams</code>添加的<code>@name</code>前缀，而其被调用处<code>testng/configuration/TestNGRunnableState.java</code></p>
+<pre><code>@Override
+protected List&lt;String&gt; getNamedParams(String parameters) {
+  try {
+    Integer.parseInt(parameters);
+    return super.getNamedParams(parameters); //添加@name
+  }
+  catch (NumberFormatException e) {
+    return Arrays.asList(parameters.split(&quot; &quot;));
+  }
+}
+</code></pre><p>可知当<code>Test runner params</code>参数为数字<code>${num}</code>时，传入参数<code>@name${num}</code>.不为数字时，直接传参.</p>
+<p>在以后使用中，可以通过设置<code>Test runner params</code>为数字，使其单独运行DataProvider某一组参数.</p>
+<h2 id="扩展"><a href="#扩展" class="headerlink" title="扩展"></a>扩展</h2><p>查看<code>xmlInclude</code>函数代码</p>
+<pre><code>private void xmlInclude(boolean start, Attributes attributes) {
+  if (start) {
+    m_locations.push(Location.INCLUDE);
+    m_currentInclude = new Include(attributes.getValue(&quot;name&quot;),
+        attributes.getValue(&quot;invocation-numbers&quot;));
+  } else {
+    String name = m_currentInclude.name;
+    if (null != m_currentIncludedMethods) {
+      String in = m_currentInclude.invocationNumbers;
+      XmlInclude include;
+      if (!Utils.isStringEmpty(in)) {
+        include = new XmlInclude(name, stringToList(in), m_currentIncludeIndex++);
+</code></pre><p>可知<code>invocationNumbers</code>变量对应到<code>testng.xml</code>文件中为<code>invocation-numbers</code>，即<br><code>Test runner params</code>参数为数字时相当于在<code>testng.xml</code>中设置<code>invocation-numbers</code>，所以也可以通过修改<code>testng.xml</code>中<code>&lt;include name=&quot;getUrl&quot;/&gt;</code>为<code>&lt;include name=&quot;getUrl&quot; invocation-numbers=&quot;0&quot;/&gt;</code>来使用.或者一次多个<code>&lt;include name=&quot;getUrl&quot; invocation-numbers=&quot;0 2 5&quot;/&gt;</code>.</p>
+<p>在网上搜索<code>invocation-numbers</code>作用</p>
+<pre><code>运行DataProvider某项失败时，在`testng-failed.xml`记录各项失败索引，
+使得你可以无需运行整个测试就可以快速重新运行失败的测试，或者无需运行所有参数，与以上分析一致.
+</code></pre><p>最后附上<code>IDEA</code>自动生成的<code>testng.xml</code></p>
+<pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;!DOCTYPE suite SYSTEM &quot;http://testng.org/testng-1.0.dtd&quot;&gt;
+&lt;suite name=&quot;Default Suite&quot;&gt;
+  &lt;test name=&quot;jpaas_web&quot;&gt;
+    &lt;classes&gt;
+      &lt;class name=&quot;com.jd.jr.jpaas.qa.springcloud.IntegrationTests.URLsTest&quot;&gt;
+        &lt;methods&gt;
+          &lt;include name=&quot;getUrl&quot;/&gt;
+        &lt;/methods&gt;
+      &lt;/class&gt; &lt;!-- com.jd.jr.jpaas.qa.springcloud.IntegrationTests.URLsTest --&gt;
+    &lt;/classes&gt;
+  &lt;/test&gt; &lt;!-- jpaas_web --&gt;
+&lt;/suite&gt; &lt;!-- Default Suite --&gt;
+</code></pre><h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://www.jetbrains.com/help/idea/run-debug-configuration-testng.html" target="_blank" rel="noopener">Run/Debug Configuration: TestNG</a></p>
+<p><a href="http://blog.leanote.com/post/freewalk/Markdown-语法手册" target="_blank" rel="noopener">Markdown 语法手册 （完整整理版)</a></p>
+<p><a href="http://blog.csdn.net/wangxh_haha/article/details/52250649" target="_blank" rel="noopener">TestNG参数化测试-数据提供程序 @DataProvider方式</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Java/" rel="tag"># Java</a>
+          
+            <a href="/tags/IDE/" rel="tag"># IDE</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2017/07/23/2017-07-23-RegNotifyChangeKeyValue-C/" rel="next" title="C#监视注册表--RegNotifyChangeKeyValue">
+                <i class="fa fa-chevron-left"></i> C#监视注册表--RegNotifyChangeKeyValue
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2017/12/12/2017-12-12-Jemalloc-Redis-Debug/" rel="prev" title="基于Jemalloc下Redis内存分析">
+                基于Jemalloc下Redis内存分析 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">Mota</p>
+              <p class="site-description motion-element" itemprop="description">描述</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">11</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">4</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                <a href="/tags/index.html">
+                  <span class="site-state-item-count">18</span>
+                  <span class="site-state-item-name">标签</span>
+                </a>
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#背景"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#代码"><span class="nav-number">2.</span> <span class="nav-text">代码</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#问题"><span class="nav-number">3.</span> <span class="nav-text">问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#定位"><span class="nav-number">4.</span> <span class="nav-text">定位</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#调试"><span class="nav-number">5.</span> <span class="nav-text">调试</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Test-runner-params"><span class="nav-number">6.</span> <span class="nav-text">Test runner params</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#扩展"><span class="nav-number">7.</span> <span class="nav-text">扩展</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#参考"><span class="nav-number">8.</span> <span class="nav-text">参考</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2018</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Mota</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Gemini</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.1.4"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <script src="//unpkg.com/valine/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: 'tqMuXfk01RdlpraEg66XYaOg-gzGzoHsz',
+        appKey: 'pg4fMhGi1elBvKSMjmHEM2v7',
+        placeholder: 'Just go go',
+        avatar:'mm',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.4.js"></script>
+  <script>AV.initialize("tqMuXfk01RdlpraEg66XYaOg-gzGzoHsz", "pg4fMhGi1elBvKSMjmHEM2v7");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+          for(var i = 0; i < entries.length; i++) {
+            var url = entries[i];
+            var element = document.getElementById(url);
+            var countSpan = $(element).find(COUNT_CONTAINER_REF);
+            if( countSpan.text() == '') {
+              countSpan.text(0);
+            }
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            /* Set ACL */
+            var acl = new AV.ACL();
+            acl.setPublicReadAccess(true);
+            acl.setPublicWriteAccess(true);
+            newcounter.setACL(acl);
+            /* End Set ACL */
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+  
+  <!-- custom analytics part create by xiamo -->
+<script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.1.js"></script>
+<script>AV.initialize("tqMuXfk01RdlpraEg66XYaOg-gzGzoHsz", "pg4fMhGi1elBvKSMjmHEM2v7");</script>
+<script>
+function showTime(Counter) {
+	var query = new AV.Query(Counter);
+	$(".leancloud_visitors").each(function() {
+		var url = $(this).attr("id").trim();
+		query.equalTo("url", url);
+		query.find({
+			success: function(results) {
+				if (results.length == 0) {
+					var content = '0 ' + $(document.getElementById(url)).text();
+					$(document.getElementById(url)).text(content);
+					return;
+				}
+				for (var i = 0; i < results.length; i++) {
+					var object = results[i];
+					var content = object.get('time') + ' ' + $(document.getElementById(url)).text();
+					$(document.getElementById(url)).text(content);
+				}
+			},
+			error: function(object, error) {
+				console.log("Error: " + error.code + " " + error.message);
+			}
+		});
+
+	});
+}
+
+function addCount(Counter) {
+	var Counter = AV.Object.extend("Counter");
+	url = $(".leancloud_visitors").attr('id').trim();
+	title = $(".leancloud_visitors").attr('data-flag-title').trim();
+	var query = new AV.Query(Counter);
+	query.equalTo("url", url);
+	query.find({
+		success: function(results) {
+			if (results.length > 0) {
+				var counter = results[0];
+				counter.fetchWhenSave(true);
+				counter.increment("time");
+				counter.save(null, {
+					success: function(counter) {
+						var content =  counter.get('time') + ' ' + $(document.getElementById(url)).text();
+						$(document.getElementById(url)).text(content);
+					},
+					error: function(counter, error) {
+						console.log('Failed to save Visitor num, with error message: ' + error.message);
+					}
+				});
+			} else {
+				var newcounter = new Counter();
+				newcounter.set("title", title);
+				newcounter.set("url", url);
+				newcounter.set("time", 1);
+				newcounter.save(null, {
+					success: function(newcounter) {
+					    console.log("newcounter.get('time')="+newcounter.get('time'));
+						var content = newcounter.get('time') + ' ' + $(document.getElementById(url)).text();
+						$(document.getElementById(url)).text(content);
+					},
+					error: function(newcounter, error) {
+						console.log('Failed to create');
+					}
+				});
+			}
+		},
+		error: function(error) {
+			console.log('Error:' + error.code + " " + error.message);
+		}
+	});
+}
+$(function() {
+	var Counter = AV.Object.extend("Counter");
+	if ($('.leancloud_visitors').length == 1) {
+		addCount(Counter);
+	} else if ($('.post-title-link').length > 1) {
+		showTime(Counter);
+	}
+}); 
+</script>
+
+  
+</body>
+</html>

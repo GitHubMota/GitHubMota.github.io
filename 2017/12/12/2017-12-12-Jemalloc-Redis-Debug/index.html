@@ -1,0 +1,1606 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next gemini use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Redis,swapdb,jemalloc," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="背景线上某业务Redis集群需要迁移到SWAPDB，预先做一次线下模拟场景，主要评估内存节约情况(本次迁移主要目的). 过程中碰到与预期不符的内存占用问题，经过分析对基于Jemalloc下Redis的内存使用有了更加深入理解. 注：以下场景及分析均基于64bit系统. 场景模拟目标业务Redis 3.2集群为三主三从，每个主节点使用内存约为3.4GB，从节点约为3.34GB(相差repl-back">
+<meta name="keywords" content="Redis,swapdb,jemalloc">
+<meta property="og:type" content="article">
+<meta property="og:title" content="基于Jemalloc下Redis内存分析">
+<meta property="og:url" content="https://githubmota.github.io/2017/12/12/2017-12-12-Jemalloc-Redis-Debug/index.html">
+<meta property="og:site_name" content="Mota&#39;s blog">
+<meta property="og:description" content="背景线上某业务Redis集群需要迁移到SWAPDB，预先做一次线下模拟场景，主要评估内存节约情况(本次迁移主要目的). 过程中碰到与预期不符的内存占用问题，经过分析对基于Jemalloc下Redis的内存使用有了更加深入理解. 注：以下场景及分析均基于64bit系统. 场景模拟目标业务Redis 3.2集群为三主三从，每个主节点使用内存约为3.4GB，从节点约为3.34GB(相差repl-back">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2018-07-02T08:17:27.027Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="基于Jemalloc下Redis内存分析">
+<meta name="twitter:description" content="背景线上某业务Redis集群需要迁移到SWAPDB，预先做一次线下模拟场景，主要评估内存节约情况(本次迁移主要目的). 过程中碰到与预期不符的内存占用问题，经过分析对基于Jemalloc下Redis的内存使用有了更加深入理解. 注：以下场景及分析均基于64bit系统. 场景模拟目标业务Redis 3.2集群为三主三从，每个主节点使用内存约为3.4GB，从节点约为3.34GB(相差repl-back">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Gemini',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="https://githubmota.github.io/2017/12/12/2017-12-12-Jemalloc-Redis-Debug/"/>
+
+
+
+
+
+  <title>基于Jemalloc下Redis内存分析 | Mota's blog</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Mota's blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">Every flight start at floor!</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-commonweal">
+          <a href="/404/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-heartbeat"></i> <br />
+            
+            公益404
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off"
+             placeholder="搜索..." spellcheck="false"
+             type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://githubmota.github.io/2017/12/12/2017-12-12-Jemalloc-Redis-Debug/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="Mota">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Mota's blog">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">基于Jemalloc下Redis内存分析</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2017-12-12T00:12:52+08:00">
+                2017-12-12
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/问题分析/" itemprop="url" rel="index">
+                    <span itemprop="name">问题分析</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2017/12/12/2017-12-12-Jemalloc-Redis-Debug/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/2017/12/12/2017-12-12-Jemalloc-Redis-Debug/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2017/12/12/2017-12-12-Jemalloc-Redis-Debug/" class="leancloud_visitors" data-flag-title="基于Jemalloc下Redis内存分析">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">阅读次数&#58;</span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>线上某业务Redis集群需要迁移到<a href="#swapdb">SWAPDB</a>，预先做一次线下模拟场景，主要评估内存节约情况(本次迁移主要目的).</p>
+<p>过程中碰到与预期不符的内存占用问题，经过分析对基于<code>Jemalloc</code>下Redis的内存使用有了更加深入理解.</p>
+<p>注：以下场景及分析均基于64bit系统.</p>
+<h2 id="场景模拟"><a href="#场景模拟" class="headerlink" title="场景模拟"></a>场景模拟</h2><p>目标业务Redis 3.2集群为三主三从，每个主节点使用内存约为3.4GB，从节点约为3.34GB(相差<code>repl-backlog-size</code>64MB大小)，Key数量为1500W，均为hash类型，且value格式均为：</p>
+<pre><code>redis&gt; hgetall 52acb36a653d48629d6cdc667a9f12de
+(0)123456789012345-123456789012
+(1)1
+</code></pre><p>基于以上信息模拟如下数据：</p>
+<pre><code>for i in range(0， 45000000):
+#key为32为uuid字符串，实际集群使用的key是全随机16进制字符串，但经过对比此差异对结果并无影响
+    key = str(uuid.uuid4()).replace(&apos;-&apos;，&apos;&apos;)
+#r为python 支持cluster接口
+    r.hset(key， &quot;123456789012345-123456789012&quot;， 1)
+</code></pre><p>启动与业务集群一致的Redis 3.2三主三从集群，并将以上数据写入，结果如下：</p>
+<pre><code>used_memory:3650444616
+used_memory_human:3.40G
+</code></pre><p>与线上内存占用一致，数据模拟正确.</p>
+<p>启动SWAPDB三主三从集群，并将以上数据写入，通过设置<code>ssdb-transfer-lower-limit 100</code>禁止转存，此时期望内存与Redis 3.2集群一直，结果如下：</p>
+<pre><code>used_memory:3126138896
+used_memory_human:2.91G
+</code></pre><p>内存节省约490MB…… 那么问题来了:</p>
+<p><strong>SWAPDB是通过转存冷数据的value到SSD中节约内存的，在未转存时应与redis内存保持一致，为什么此时节约490MB内存?</strong></p>
+<p>考虑到SWAPDB是基于Redis 4.0做的改动，先查看是否由于Redis版本升级导致的，启动原生Redis 4.0集群对比：</p>
+<pre><code>used_memory:3125854232
+used_memory_human:2.91G
+</code></pre><p>可以看到其与SWAPDB是一致的，故该处节约490MB内存是Redis 4.0版本升级导致的.</p>
+<h2 id="Redis内存优化分析"><a href="#Redis内存优化分析" class="headerlink" title="Redis内存优化分析"></a>Redis内存优化分析</h2><p>在<a href="https://raw.githubusercontent.com/antirez/redis/4.0/00-RELEASENOTES" target="_blank" rel="noopener">Redis 4.0 日志</a>中搜索关于Memory优化的commit，未找到相关说明.</p>
+<p>考虑到Redis可能对key-value DB存储做出过优化，启动单实例(带一个从节点)写入数据，结果Redis 3.2/ Redis 4.0均使用内存大约为1.91GB.</p>
+<p>即key-value DB存储处起码针对此次hash类型key-value未有内存优化的升级.</p>
+<p>只能是在集群相关处有内存优化可能.而且只对比单实例与集群节点内存差距也很大：</p>
+<pre><code>Redis 4.0: 2.91 - 1.91 GB - 64MB = 960MB
+Redis 3.2: 3.40 - 1.91 GB - 64MB = 1.43GB
+注： 减去64MB是主节点多出来的repl-backlog-size大小
+</code></pre><p>内存差距如此大肯定是跟记录1500W个key信息有关，和集群相关的数据结构包括：<code>clusterNode/clusterLink/clusterState</code>，数据结构源码比较简单，最后在Redis 4.0 代码的clusterState结构体里找到：</p>
+<pre><code>uint64_t slots_keys_count[CLUSTER_SLOTS];
+rax *slots_to_keys;
+</code></pre><p><code>Rax tree</code>确实是作者新加入的数据结构，之前看过文章，了解了下其结构，但没看到作者说其在redis哪块使用，也没去代码里找，在<a href="https://raw.githubusercontent.com/antirez/redis/4.0/00-RELEASENOTES" target="_blank" rel="noopener">Redis 4.0 日志</a>中提到，说是为了修复集群慢的问题：</p>
+<pre><code>* A new data structure， the radix tree (rax.c) was introduced into Redis in
+  order to fix a major Redis Cluster slowdown. (Salvatore Sanfilippo)
+</code></pre><p>对比Redis 3.2代码：</p>
+<pre><code>zskiplist *slots_to_keys;
+</code></pre><p>从名称上看得出来这是记录slot和key的映射关系，查看代码其调用函数<code>getKeysInSlot()</code>遍历该结构查询对应slot有哪些key，所以结构里存储了1500W key的信息占用了大量内存.</p>
+<h2 id="zskiplist内存分析"><a href="#zskiplist内存分析" class="headerlink" title="zskiplist内存分析"></a>zskiplist内存分析</h2><p><code>zskiplist</code>由<code>zskiplistNode</code>链接而成，具体介绍见后续<a href="#zskiplist">参考</a>，Redis 3.2中<code>zskiplistNode</code>定义：</p>
+<pre><code>typedef struct zskiplistNode {
+    robj *obj;    //8 bytes + obj len，Redis 4.0中改成sds ele，更节约内存
+    double score; //8 bytes
+    struct zskiplistNode *backward; //8 bytes
+    struct zskiplistLevel {
+        struct zskiplistNode *forward; //8 bytes
+        unsigned int span; //4 bytes
+    } level[];  //n level
+} zskiplistNode;
+</code></pre><p>key对应的<code>hash slot</code>为score，key存储在obj对象之中.</p>
+<p>查看robj及sds定义：</p>
+<pre><code>typedef struct redisObject {
+    unsigned type:4;
+    unsigned encoding:4;
+    unsigned lru:LRU_BITS; //4 bytes
+    int refcount; //4 bytes
+    void *ptr; //8 bytes + sds len (createEmbeddedStringObject， sdshdr8)
+} robj;
+
+struct __attribute__ ((__packed__)) sdshdr8 {
+    uint8_t len; //1 byte
+    uint8_t alloc; //1 byte
+    unsigned char flags; //1 byte
+    char buf[]; //key len
+};
+</code></pre><p>如上，每个<code>zskiplistNode</code>占用内存为</p>
+<pre><code>8+obj len +8+8+(8+4)*n=24+12*n+4+4+8+sds len=40+12*n+1+1+1+key len+1=76+12*n bytes
+</code></pre><p>Redis 3.2 集群节点比单实例节点大1.43GB， 平均到每个key大约为95.3 Bytes. n约为1.608，即<code>zskiplistNode</code>的level平均为1.608.</p>
+<h2 id="ZskiplistNode-Level计算"><a href="#ZskiplistNode-Level计算" class="headerlink" title="ZskiplistNode Level计算"></a>ZskiplistNode Level计算</h2><pre><code>int zslRandomLevel(void) {
+    int level = 1;
+    while ((random()&amp;0xFFFF) &lt; (ZSKIPLIST_P * 0xFFFF)) //ZSKIPLIST_P==0.25
+        level += 1;
+    return (level&lt;ZSKIPLIST_MAXLEVEL) ? level : ZSKIPLIST_MAXLEVEL;//ZSKIPLIST_MAXLEVEL==32
+}
+</code></pre><p>该函数返回level期望为1.333. 基于该值算出1500W个ziplistnode占用内存为1.38GB左右.与前面的1.43GB差距为50MB，考虑到集群其他一些结构也会占用少量内存，并且Jemalloc内存分配内存是按block分配的， 一整块一整块分配，也不可能完全精确计算，该误差可认为在正常范围内.</p>
+<h2 id="Rax-tree-结构"><a href="#Rax-tree-结构" class="headerlink" title="Rax tree 结构"></a>Rax tree 结构</h2><p>Redis 4.0 集群节点比单实例节点大1GB， 平均到每个key大约为67 Bytes.</p>
+<pre><code>typedef struct rax {
+    raxNode *head;
+    uint64_t numele;
+    uint64_t numnodes;
+} rax;
+
+typedef struct raxNode {
+    uint32_t iskey:1;     /* Does this node contain a key? */
+    uint32_t isnull:1;    /* Associated value is NULL (don&apos;t store it). */
+    uint32_t iscompr:1;   /* Node is compressed. */
+    uint32_t size:29;     /* Number of children， or compressed string len. */
+    unsigned char data[];
+} raxNode;
+</code></pre><p>从raxNode的结构来看，由于其每个节点大小都不固定，不能像分析zskiplist内存一样每个Node占用内存基本相同来计算总体.</p>
+<p>先对<code>rax tree</code>单独分析，下载rax项目<a href="https://github.com/antirez/rax.git" target="_blank" rel="noopener">rax 源码</a>，将以下代码加入<code>rax-test.c</code>中:</p>
+<pre><code>char *random_uuid( char buf[33] )
+{
+    char *p = buf;
+    int n;
+    for( n = 0; n &lt; 32; ++n )
+    {
+        int b = rand()%16;
+        sprintf(p， &quot;%x&quot;， b);
+        p += 1;
+    }
+    *p = 0;
+    return buf;
+}
+void uuidMemTest(){
+    rax *t = raxNew();
+    char buf[64]， guid[33];
+    unsigned int hashslot;
+    int len = 34;   //2 bytes(hashslot)+32 bytes(keylen)
+    for (int i = 0; i &lt; 45000000; i++) {
+        random_uuid(guid);
+        hashslot = i%16384;   //slot信息占两个字节加入到key头部
+        if(hashslot&gt;5460) continue;
+
+        buf[0] = (hashslot &gt;&gt; 8) &amp; 0xff;
+        buf[1] = hashslot &amp; 0xff;
+
+        sprintf(buf+2，&quot;%s&quot;，guid);
+
+        raxInsert(t，(unsigned char*)buf，len，NULL，NULL);
+    }
+}
+</code></pre><p>在<code>main</code>函数中运行<code>uuidMemTest()</code>，运行完毕后查看程序占用内存，结果如下：</p>
+<pre><code>t-&gt;numel == 15001367， t-&gt;numnodes=35066975， 内存使用 1.482g
+</code></pre><p><code>t-&gt;numel</code>为插入key的数量，<code>t-&gt;numnodes</code>为<code>rax tree</code>中建立的raxNode数量，内存使用为1.482g，远超过了预期的960MB.</p>
+<p>查看该项目中<code>rax_malloc.h</code>文件中默认使用的是libc内存分配器，而Redis 3.2和4.0均使用的是jemalloc.所以先使用jemalloc替换该项目中的libc.</p>
+<h2 id="Jemalloc替换"><a href="#Jemalloc替换" class="headerlink" title="Jemalloc替换"></a>Jemalloc替换</h2><p>替换步骤如下</p>
+<ol>
+<li><p>rax_malloc.h文件中:</p>
+<p> malloc-&gt;je_malloc<br> realloc-&gt;je_realloc<br> free-&gt;je_free</p>
+</li>
+<li><p>rax.h文件中加入<code>#include &lt;jemalloc/jemalloc.h&gt;</code></p>
+</li>
+<li><p>github上下载<a href="https://github.com/jemalloc/jemalloc/releases" target="_blank" rel="noopener">jemalloc</a>，解压后进入目录执行:</p>
+<p> ./configure –with-jemalloc-prefix=je_ –prefix=/usr/local/jemalloc<br> make -j8 &amp;&amp; make install<br> echo /usr/local/jemalloc/lib &gt;&gt; /etc/ld.so.conf<br> ldconfig</p>
+</li>
+<li><p>Makefile文件中编译rax-test目标命令后添加<code>-L/usr/local/jemalloc/lib -ljemalloc</code></p>
+</li>
+</ol>
+<p>替换完成，编译运行rax-test即可.</p>
+<h2 id="Rax-tree-with-Jemalloc-内存"><a href="#Rax-tree-with-Jemalloc-内存" class="headerlink" title="Rax tree with Jemalloc 内存"></a>Rax tree with Jemalloc 内存</h2><p>替换成<code>jemalloc</code>后运行<span id="uuid result">结果</span>:</p>
+<pre><code>t-&gt;numel == 15001367， t-&gt;numnodes=35066975， 内存使用992.5MB.
+</code></pre><p>虽然场景中redis集群节点只多了960MB大小内存，与单独插入1500W keys的<code>rax tree</code>占用大小992.5MB有32MB差距，但考虑到<code>Jemalloc</code>内存分配内存是按block分配的， 一整块一整块分配，也不可能完全精确计算，该误差在正常范围内，可认为Redis 4.0集群节点多出来的内存都是Rax tree占用的.</p>
+<p>接下来分析下1500W keys的<code>rax tree</code>如何使用的900+MB内存.</p>
+<p>数据看起来有点复杂……简化起见先对写入数据为(000000-999999)的<code>rax tree</code>进行分析：</p>
+<pre><code>for (int i = 0; i &lt;= 1000000; i++) {
+    sprintf(buf， &quot;%06d&quot;， i);
+    raxInsert(t， (unsigned char *) buf， 6， NULL， NULL);
+}
+</code></pre><p>运行上面代码写入数据后结果:</p>
+<pre><code>t-&gt;numel == 1000000， t-&gt;numnodes=1111111， 内存使用24280 kb.(写入前为5848 kb)
+即100w个元素(000000-999999)`rax tree`占用了24280 - 5848 kb = 18432 kb
+</code></pre><p>从代码数据结构分析(详情见<a href="#rax">参考</a>)<code>rax tree</code>占用，100w个元素(000000-999999)的<code>rax tree</code>结构如下：</p>
+<pre><code>[node header][0-9](10 ptr)   (94 bytes: 4 bytes:header+ 10 bytes:0 ~ 9 字符 + 80 bytes:10个bit64位指针)
+|
+[node header][0-9](10 ptr)   * 10 940bytes
+|
+[node header][0-9](10 ptr)   * 10*10 9400bytes
+|
+[node header][0-9](10 ptr)   * 10 * 10 *10   94000bytes
+|
+[node header][0-9](10 ptr)   * 10 * 10 * 10 * 10  940000bytes
+|
+[node header][0-9](10 ptr)   * 10 * 10 * 10 * 10 * 10    = 100，000  9400000bytes
+|
+[node header] *100w 400w bytes
+每个元素指向一个空 data 的raxNode，指示该节点是一个key  (4bytes) 100w个插入元素
+</code></pre><p>所以数据(000000-999999)插入后内存应占用以上之和又相当于</p>
+<pre><code>t-&gt;numnodes * 4 (每个node head大小) + (t-&gt;numnodes-100w) * 90 (每个节点字符和其指针大小)  = 14444434 bytes.
+</code></pre><p>很明显与实际占用18432 kb = 18874368 bytes差别很大.</p>
+<h2 id="内存差异原因"><a href="#内存差异原因" class="headerlink" title="内存差异原因"></a>内存差异原因</h2><p>尝试通过valgrind的memcheck找下是否有内存泄漏问题，运行如下</p>
+<pre><code>valgrind --track-origins=yes --suppressions=./valgrind.sup --show-reachable=no --show-possibly-lost=no --leak-check=full ./rax-test
+</code></pre><p>打印如下：</p>
+<pre><code>==16686== 8 bytes in 1 blocks are definitely lost in loss record 1 of 3
+==16686==    at 0x514864A: je_malloc (jemalloc.c:1441)
+==16686==    by 0x403AAB: raxNewNode (rax.c:145)
+</code></pre><p>期望raxNewNode()应该是分配4 bytes(node head大小).却分配了8 bytes，debug查看调用<code>je_malloc</code>处也是4.</p>
+<p>原因是jemalloc最小分配内存单元是8bytes的分配机制导致，写程序测试多次jemalloc场景并使用命令top显示验证结果如下:</p>
+<pre><code>14431 zj   20   0   19888   4688   2432 S   0.0  0.0   0:00.02 demo   0 次分配程序初始内存
+14471 zj   20   0   30128  15032   2540 S   1.7  0.1   0:00.05 demo   1000*1024次分配4bytes
+14503 zj   20   0   30128  14956   2464 S   1.0  0.1   0:00.04 demo   每次8 bytes
+14540 zj   20   0   38320  23136   2452 S   1.0  0.1   0:00.05 demo   每次10 bytes
+14571 zj   20   0   38320  23108   2424 S   2.0  0.1   0:00.06 demo   每次16 bytes
+</code></pre><p>可以看到每次分配4bytes和8字节是一样的，每次分配10bytes和16bytes也是一样的.</p>
+<p>所以<code>rax tree</code>每个node虽然size是4bytes，但是每次<code>jemalloc</code>需分配8字节.</p>
+<p>故<code>rax tree</code>内存实际由<code>jemalloc</code>分配</p>
+<pre><code>t-&gt;numnodes*8 (每个node head) + (t-&gt;numnodes-100w)*90 (每个节点字符和其指针)=18888878 bytes~=18874368 bytes
+</code></pre><p>注:<code>jemalloc</code>的分配机制也影响到前面的分析，计算出来的内存无法完全与实际分配的内存一致，只是在此处由于数量巨大，才明显出现差异.</p>
+<h2 id="1500w-uuid-rax-tree-内存分析"><a href="#1500w-uuid-rax-tree-内存分析" class="headerlink" title="1500w uuid rax tree 内存分析"></a>1500w uuid rax tree 内存分析</h2><p>见Rax tree with Jemalloc 内存<a href="#uuid result">运行结果</a>:</p>
+<pre><code>t-&gt;numel == 15001367， t-&gt;numnodes=35066975， 内存使用992.5MB.
+</code></pre><p>即随机数1500W个uuid插入后，占用3500W个nodes，内存大约1GB.</p>
+<p>每个uuid key插入时，其slot信息(2个字节)加入到其头部:</p>
+<pre><code>void slotToKeyUpdateKey(robj *key, int add) {
+    int ret;
+    unsigned int hashslot = keyHashSlot(key-&gt;ptr,sdslen(key-&gt;ptr));
+    unsigned char buf[64];
+    unsigned char *indexed = buf;
+    size_t keylen = sdslen(key-&gt;ptr);
+
+    if (!server.swap_mode) server.cluster-&gt;slots_keys_count[hashslot] += add ? 1 : -1;
+    if (keylen+2 &gt; 64) indexed = zmalloc(keylen+2);
+    indexed[0] = (hashslot &gt;&gt; 8) &amp; 0xff;
+    indexed[1] = hashslot &amp; 0xff;
+    memcpy(indexed+2,key-&gt;ptr,keylen);
+    if (add) {
+        ret = raxInsert(server.cluster-&gt;slots_to_keys,indexed,keylen+2,NULL,NULL);
+        if (server.swap_mode &amp;&amp; ret == 1)
+            server.cluster-&gt;slots_keys_count[hashslot] += 1;
+    } else {
+        ret = raxRemove(server.cluster-&gt;slots_to_keys,indexed,keylen+2,NULL);
+        if (server.swap_mode &amp;&amp; ret == 1)
+            server.cluster-&gt;slots_keys_count[hashslot] += -1;
+    }
+    if (indexed != buf) zfree(indexed);
+}
+</code></pre><p>slot <code>0 ~ 5460</code>即十六进制的<code>0x0~0x1554</code>,则第一个节点为0~21,第二个节点为0~255,其中21对应的下层节点范围为<code>0x0-0x54(84)</code>,此时树结构大致如下:</p>
+<pre><code>1 [node header][0-20/21](22 ptr)     206 bytes: 8+22+22*8
+|
+2 [node header][0-255](256 ptr) *21 ---- [node header][0-84](85 ptr) *1  3085 bytes: 8+256+256*8 + 8+85+85*8
+|
+3 [node header][0-9a-f](16 ptr) * 5461  152bytes*5461 每个节点命中1500W/5461次
+|
+4 [node header][0-9a-f](16 ptr) * 5461 *16 152bytes*5461*16 每个节点命中1500W/5461/16次
+|
+5 [node header][0-9a-f](16 ptr) * 5461 *16 *16 152bytes*5461*16*16 每个节点命中1500W/5461/16/16~=10次
+|
+6 这一层node不好估计...
+:
+:
+35  每个ptr指向一个空data 的raxNode，指示该节点是一个key  (8bytes) 1500w个插入元素
+</code></pre><p>前面1-5层由于命中次数多，则其后续字符覆盖<code>[0-9a-f]</code>概率很高，故可以认为每个节点均拥有16个孩子节点.</p>
+<p>到第5层时，由于每次父节点命中平均只有10次，故其后续字符部分可能只命中一次，部分可能也能命中几次，只命中一次的节点则为compress nodes<br><code>[node header][27 chars](1 ptr)</code>，重复命中的节点在第6层仍为普通节点，在第7层为compress nodes <code>[node header][26 chars](1 ptr)</code>.</p>
+<p>需分析命中一次和多次节点数的期望，即10个<code>[0-9a-f]</code>的字符重复一次和多次的期望.<a href=""><strong>TODO</strong></a></p>
+<p>期望分析比较复杂，暂时没有解决方案，先分析两种极端情况:</p>
+<ol>
+<li><p>极端情况下如果这10次每次都不一样的字符，则第6层开始均为1500W个compress nodes:  </p>
+<ul>
+<li><p><code>[node header][27 chars](1 ptr) * 1500W    (8+27+8)*1500W</code></p>
+</li>
+<li><p>则该情况下</p>
+</li>
+<li><p><code>t-&gt;numnodes=1+22+5461+5461*16+5461*16^2+1500W+1500W=31490876</code></p>
+</li>
+<li><code>206+3085+152*(5461+5461*16+5461*16^2)+43*1500W+8*1500W=991612947 bytes ~= 945.7MB</code></li>
+</ul>
+</li>
+<li><p>另一种极端情况为这10次每次命中同一种字符，到了第7层每次命中不一样的字符，第7层开始均为1500W个compress nodes</p>
+<ul>
+<li>第6层:<code>[node header][0-f](10 ptr) * 5461*16*16         (8+10+10*8)*5461*16*16</code></li>
+<li><p>第7层:<code>[node header][26 chars](1 ptr) * 1500W    (8+26+8)*1500W</code></p>
+</li>
+<li><p>则该情况下</p>
+</li>
+<li><p><code>t-&gt;numnodes=1+22+5461+5461*16+5461*16^2+1500W+1500W+5461*16*16=32888892</code></p>
+</li>
+<li><code>206+3085+152*5461*(1+16+16^2)+42*1500W+8*1500W+98*5461*16*16=1113618515 bytes ~= 1062MB</code></li>
+</ul>
+</li>
+</ol>
+<p>从以上两种情况结果看，与实际运行的结果<code>(节点数和内存)</code>比较接近.</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>集群模式下，记录slot和key的映射关系的<code>slots_to_keys</code>会占用比较可观的内存，Redis 4.0使用rax tree替代zskiplist结构存储不仅解决了其日志中<code>Redis Cluster slowdown</code>问题.</p>
+<p>同时节约了一定量的内存，本场景1500W个uuid key相应内存使用从1.43GB降至960MB.</p>
+<p>最后从对<code>jemalloc</code>的分析可以看出，在每次分配每个node<code>(4 bytes)</code>时会分配8 bytes的内存块，此处多分配<code>35066975(节点数)*4 bytes</code>=133.8MB，也许<code>rax tree</code>还有优化空间.</p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><span id="swapdb"><a href="https://github.com/JRHZRD/swapdb" target="_blank" rel="noopener">swapdb - 基于redis改造的冷热数据存储分离数据库</a></span></p>
+<p><span id="rax"><a href="https://github.com/antirez/rax" target="_blank" rel="noopener">Rax, an ANSI C radix tree implementation</a></span></p>
+<p><span id="zskiplist"><a href="http://redisbook.readthedocs.io/en/latest/internal-datastruct/skiplist.html" target="_blank" rel="noopener">zskiplist - Redis内部数据结构详解之跳跃表</a></span></p>
+<p><a href="http://www.cnblogs.com/gaoxing/p/4253833.html" target="_blank" rel="noopener">jemalloc和内存管里</a></p>
+<p><a href="http://blog.csdn.net/xiaofei_hah0000/article/details/52214592" target="_blank" rel="noopener">jemalloc在linux上从安装到使用</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Redis/" rel="tag"># Redis</a>
+          
+            <a href="/tags/swapdb/" rel="tag"># swapdb</a>
+          
+            <a href="/tags/jemalloc/" rel="tag"># jemalloc</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2017/11/30/2017-11-30-TestNG-IDEA-Debug-Dataprovider/" rel="next" title="IDEA TestNG DataProvider问题调试">
+                <i class="fa fa-chevron-left"></i> IDEA TestNG DataProvider问题调试
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2017/12/27/2017-12-27-Optane-SSD-Memory-Benchmark/" rel="prev" title="Optane SSD虚拟内存Redis性能测试">
+                Optane SSD虚拟内存Redis性能测试 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">Mota</p>
+              <p class="site-description motion-element" itemprop="description">描述</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">11</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">4</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                <a href="/tags/index.html">
+                  <span class="site-state-item-count">18</span>
+                  <span class="site-state-item-name">标签</span>
+                </a>
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#背景"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#场景模拟"><span class="nav-number">2.</span> <span class="nav-text">场景模拟</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Redis内存优化分析"><span class="nav-number">3.</span> <span class="nav-text">Redis内存优化分析</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#zskiplist内存分析"><span class="nav-number">4.</span> <span class="nav-text">zskiplist内存分析</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#ZskiplistNode-Level计算"><span class="nav-number">5.</span> <span class="nav-text">ZskiplistNode Level计算</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Rax-tree-结构"><span class="nav-number">6.</span> <span class="nav-text">Rax tree 结构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Jemalloc替换"><span class="nav-number">7.</span> <span class="nav-text">Jemalloc替换</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Rax-tree-with-Jemalloc-内存"><span class="nav-number">8.</span> <span class="nav-text">Rax tree with Jemalloc 内存</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#内存差异原因"><span class="nav-number">9.</span> <span class="nav-text">内存差异原因</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1500w-uuid-rax-tree-内存分析"><span class="nav-number">10.</span> <span class="nav-text">1500w uuid rax tree 内存分析</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#总结"><span class="nav-number">11.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#参考"><span class="nav-number">12.</span> <span class="nav-text">参考</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2018</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Mota</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Gemini</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.1.4"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <script src="//unpkg.com/valine/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: 'tqMuXfk01RdlpraEg66XYaOg-gzGzoHsz',
+        appKey: 'pg4fMhGi1elBvKSMjmHEM2v7',
+        placeholder: 'Just go go',
+        avatar:'mm',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.4.js"></script>
+  <script>AV.initialize("tqMuXfk01RdlpraEg66XYaOg-gzGzoHsz", "pg4fMhGi1elBvKSMjmHEM2v7");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+          for(var i = 0; i < entries.length; i++) {
+            var url = entries[i];
+            var element = document.getElementById(url);
+            var countSpan = $(element).find(COUNT_CONTAINER_REF);
+            if( countSpan.text() == '') {
+              countSpan.text(0);
+            }
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            /* Set ACL */
+            var acl = new AV.ACL();
+            acl.setPublicReadAccess(true);
+            acl.setPublicWriteAccess(true);
+            newcounter.setACL(acl);
+            /* End Set ACL */
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+  
+  <!-- custom analytics part create by xiamo -->
+<script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.1.js"></script>
+<script>AV.initialize("tqMuXfk01RdlpraEg66XYaOg-gzGzoHsz", "pg4fMhGi1elBvKSMjmHEM2v7");</script>
+<script>
+function showTime(Counter) {
+	var query = new AV.Query(Counter);
+	$(".leancloud_visitors").each(function() {
+		var url = $(this).attr("id").trim();
+		query.equalTo("url", url);
+		query.find({
+			success: function(results) {
+				if (results.length == 0) {
+					var content = '0 ' + $(document.getElementById(url)).text();
+					$(document.getElementById(url)).text(content);
+					return;
+				}
+				for (var i = 0; i < results.length; i++) {
+					var object = results[i];
+					var content = object.get('time') + ' ' + $(document.getElementById(url)).text();
+					$(document.getElementById(url)).text(content);
+				}
+			},
+			error: function(object, error) {
+				console.log("Error: " + error.code + " " + error.message);
+			}
+		});
+
+	});
+}
+
+function addCount(Counter) {
+	var Counter = AV.Object.extend("Counter");
+	url = $(".leancloud_visitors").attr('id').trim();
+	title = $(".leancloud_visitors").attr('data-flag-title').trim();
+	var query = new AV.Query(Counter);
+	query.equalTo("url", url);
+	query.find({
+		success: function(results) {
+			if (results.length > 0) {
+				var counter = results[0];
+				counter.fetchWhenSave(true);
+				counter.increment("time");
+				counter.save(null, {
+					success: function(counter) {
+						var content =  counter.get('time') + ' ' + $(document.getElementById(url)).text();
+						$(document.getElementById(url)).text(content);
+					},
+					error: function(counter, error) {
+						console.log('Failed to save Visitor num, with error message: ' + error.message);
+					}
+				});
+			} else {
+				var newcounter = new Counter();
+				newcounter.set("title", title);
+				newcounter.set("url", url);
+				newcounter.set("time", 1);
+				newcounter.save(null, {
+					success: function(newcounter) {
+					    console.log("newcounter.get('time')="+newcounter.get('time'));
+						var content = newcounter.get('time') + ' ' + $(document.getElementById(url)).text();
+						$(document.getElementById(url)).text(content);
+					},
+					error: function(newcounter, error) {
+						console.log('Failed to create');
+					}
+				});
+			}
+		},
+		error: function(error) {
+			console.log('Error:' + error.code + " " + error.message);
+		}
+	});
+}
+$(function() {
+	var Counter = AV.Object.extend("Counter");
+	if ($('.leancloud_visitors').length == 1) {
+		addCount(Counter);
+	} else if ($('.post-title-link').length > 1) {
+		showTime(Counter);
+	}
+}); 
+</script>
+
+  
+</body>
+</html>
